@@ -2,15 +2,18 @@ from typing import Callable, Dict, Any, Awaitable, List
 
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
+import config
 
 
 class CheckIsAdminMiddleware(BaseMiddleware):
     """Проверка является ли пользователь админом"""
-    def __init__(self, admins: List[int]):
+    def __init__(self, admins: List[str]):
         self.admins = admins
 
-    def is_admin(self, user_id) -> bool:
-        return user_id in self.admins
+    def is_admin(self, tg_id) -> bool:
+        if str(tg_id) not in config.ADMINS:
+            return False
+        return True
 
     async def __call__(self,
             handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
@@ -23,6 +26,7 @@ class CheckIsAdminMiddleware(BaseMiddleware):
 
         # ответ для обычных пользователей
         await event.answer(
-            "Эта функция доступна только для администраторов"
+            "Эта функция доступна только для администраторов",
+            show_alert=True
         )
         return

@@ -1,4 +1,4 @@
-def amount_validate(amount: str) -> int|str:
+def amount_validate(amount: str) -> int | str:
     """Корректировка формата суммы"""
     result = ""
     for ch in amount:

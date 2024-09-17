@@ -9,6 +9,7 @@ from google_sheets_api import gs
 
 import keyboards as kb
 from config import GROUP_ID
+import messages as ms
 
 router = Router()
 
@@ -17,6 +18,15 @@ router = Router()
 async def start_handler(message: types.Message) -> None:
     """Start message"""
     await message.answer("Выберите действие 📋", reply_markup=kb.operations_keyboard().as_markup())
+    tg_id = str(message.from_user.id)
+
+    if message.from_user.username:
+        username = message.from_user.username
+    else:
+        username = str(message.from_user.first_name or "") + " " + str(message.from_user.last_name or "")
+        username.strip()
+
+    gs.create_user_in_balance(tg_id, username)
 
 
 @router.callback_query(lambda callback: callback.data.split("_")[0] == "operation")
@@ -29,22 +39,26 @@ async def plus_operation(callback: types.CallbackQuery, state: FSMContext) -> No
     else:
         await state.update_data(type="Списание")
 
-    msg = await callback.message.edit_text("Укажите сумму (например 550)", reply_markup=kb.cancel_keyboard().as_markup())
+    msg = await callback.message.edit_text("Укажите сумму (например: 550)", reply_markup=kb.cancel_keyboard().as_markup())
     await state.update_data(prev_message=msg)
 
 
 @router.message(OperationFSM.amount, F.text)
 async def get_amount(message: types.Message, state: FSMContext) -> None:
     """Получение суммы, данных о пользователе"""
-    await state.update_data(tg_id=message.from_user.id)
-    await state.update_data(username=message.from_user.username)
+    await state.update_data(tg_id=str(message.from_user.id))
+
+    if message.from_user.username:
+        username = message.from_user.username
+    else:
+        username = str(message.from_user.first_name or "") + " " + str(message.from_user.last_name or "")
+        username.strip()
+    await state.update_data(username=username)
 
     amount = message.text
     result = amount_validate(amount)
 
     if result == "error":
-        await message.delete()
-
         data = await state.get_data()
         prev_mess = data["prev_message"]
         await prev_mess.delete()
@@ -56,7 +70,6 @@ async def get_amount(message: types.Message, state: FSMContext) -> None:
     else:
         await state.update_data(amount=result)
         await state.set_state(OperationFSM.comment)
-        await message.delete()
 
         data = await state.get_data()
         prev_mess = data["prev_message"]
@@ -81,16 +94,14 @@ async def get_comment(message: types.Message, state: FSMContext, bot: aiogram.Bo
     data_for_record = [data["type"], data["tg_id"], data["username"], data["amount"], data["comment"]]
     gs.add_operation(data_for_record)
 
-    await message.answer("Операция успешно записана! ✅")
+    await message.answer(f"Операция успешно записана! ✅\n\n <i>Операция: {data['type']} на сумму {data['amount']}</i>")
     await message.answer("Выберите действие 📋", reply_markup=kb.operations_keyboard().as_markup())
-
-    await message.delete()
 
     prev_mess = data["prev_message"]
     await prev_mess.delete()
 
     # оповещение в группу
-    await bot.send_message(chat_id=GROUP_ID, text="texttt")
+    await bot.send_message(chat_id=GROUP_ID, text=ms.create_notify_group_message(data))
 
 
 @router.callback_query(lambda callback: callback.data == "cancel", StateFilter("*"))

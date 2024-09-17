@@ -7,4 +7,6 @@ class OperationFSM(StatesGroup):
 
 
 class BalanceFSM(StatesGroup):
+    pick_user = State()
     amount = State()
+

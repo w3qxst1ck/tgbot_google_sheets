@@ -1,3 +1,4 @@
+import aiogram
 from aiogram import Router, types, F
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, StateFilter
@@ -9,40 +10,48 @@ from config import ADMINS
 from google_sheets_api import gs
 from middlewares import CheckIsAdminMiddleware
 from utils import amount_validate
+from config import GROUP_ID
+import messages as ms
+from apsched import send_balance_report
 
 router = Router()
-router.message.middleware.register(CheckIsAdminMiddleware(ADMINS))
+router.callback_query.middleware.register(CheckIsAdminMiddleware(ADMINS))
 
 
-@router.message(Command("balance"))
 @router.callback_query(lambda callback: callback.data == "add_balance")
-async def add_balance(message: types.Message, state: FSMContext) -> None:
+async def add_balance(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Начало BalanceFSM"""
+    await state.set_state(BalanceFSM.pick_user)
+
+    all_users_id, all_usernames = gs.get_all_users()
+
+    msg = await callback.message.edit_text("Выберите пользователя для пополнения",
+                                           reply_markup=kb.all_users_keyboard(all_users_id, all_usernames).as_markup())
+    await state.update_data(prev_message=msg)
+
+
+@router.callback_query(BalanceFSM.pick_user, lambda callback: callback.data.split("_")[0] == "add")
+async def get_users_to_add(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Получение пользователя для пополнения"""
+    tg_id = callback.data.split("_")[1]
+    username = callback.data.split("_")[2]
+    await state.update_data(tg_id=tg_id)
+    await state.update_data(username=username)
+
     await state.set_state(BalanceFSM.amount)
+    msg = await callback.message.edit_text("Укажите сумму (например: 550)",
+                                           reply_markup=kb.cancel_keyboard().as_markup())
 
-    if type(message) == types.Message:
-        msg = await message.answer("Укажите сумму (только число, без знаков или указания валют по типу р. руб."
-                                     "\nНапример: 1500.", reply_markup=kb.cancel_keyboard().as_markup())
-        await state.update_data(prev_message=msg)
-
-    elif type(message) == types.CallbackQuery:
-        msg = await message.message.edit_text("Укажите сумму (только число, без знаков или указания валют по типу р. руб."
-                             "\nНапример: 1200.", reply_markup=kb.cancel_keyboard().as_markup())
-        await state.update_data(prev_message=msg)
+    await state.update_data(prev_message=msg)
 
 
 @router.message(BalanceFSM.amount, F.text)
-async def get_amount(message: types.Message, state: FSMContext) -> None:
+async def get_amount(message: types.Message, state: FSMContext, bot: aiogram.Bot) -> None:
     """Получение суммы, данных о пользователе"""
-    await state.update_data(tg_id=message.from_user.id)
-    await state.update_data(username=message.from_user.username)
-
     amount = message.text
     result = amount_validate(amount)
 
     if result == "error":
-        await message.delete()
-
         data = await state.get_data()
         try:
             await data["prev_message"].delete()
@@ -55,19 +64,28 @@ async def get_amount(message: types.Message, state: FSMContext) -> None:
 
     else:
         await state.update_data(amount=result)
+        await state.update_data(type="Пополнить баланс")
         data = await state.get_data()
 
-        data_for_record = ["Пополнить баланс", data["tg_id"], data["username"], data["amount"], ""]
+        data_for_record = [data["type"], data["tg_id"], data["username"], data["amount"], ""]
         gs.add_operation(data_for_record)
 
-        await message.answer("Операция успешно записана! ✅")
+        await message.answer(f"Баланс пользователя <b>{data['username']}</b> успешно пополнен на <b>{data['amount']}</b> руб.✅")
         await message.answer("Выберите действие 📋", reply_markup=kb.operations_keyboard().as_markup())
 
-        await message.delete()
         try:
             await data["prev_message"].delete()
         except TelegramBadRequest:
             pass
+
+        # оповещение в группу
+        await bot.send_message(chat_id=GROUP_ID, text=ms.create_notify_group_message(data))
+
+
+@router.callback_query(lambda callback: callback.data == "get_report")
+async def get_report(callback: types.CallbackQuery, bot: aiogram.Bot):
+    """Получение отчета вручную"""
+    await send_balance_report(bot)
 
 
 @router.callback_query(lambda callback: callback.data == "cancel", StateFilter("*"))

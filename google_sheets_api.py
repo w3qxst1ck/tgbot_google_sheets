@@ -11,9 +11,28 @@ class GoogleSheets:
         self.wks_operations = self.gc.open(table_name).sheet1
         self.wks_balance = self.gc.open(table_name).get_worksheet(index=1)
 
+        # первоначальное заполнение шапки таблиц
+        self.wks_balance.batch_update([
+            {
+                "range": "A1:D1",
+                "values": [["№", "ID(тг)", "Имя", "Текущий баланс"]]
+            }
+        ])
+        self.wks_operations.batch_update([
+            {
+                "range": "A1:F1",
+                "values": [["№", "Вид операции", "ID(тг)", "Имя", "Сумма", "Комментарий"]]
+            }
+        ])
+
     def get_next_operation_id(self) -> int:
-        """Получение нового id для следующей строки таблицы"""
+        """Получение нового id для следующей строки таблицы операций"""
         all_values = self.wks_operations.get_all_values()
+        return len(all_values)
+
+    def get_next_balance_id(self) -> int:
+        """Получение нового id для следующей строки таблицы баланса"""
+        all_values = self.wks_balance.get_all_values()
         return len(all_values)
 
     def add_operation(self, data: List):
@@ -21,20 +40,47 @@ class GoogleSheets:
         id = self.get_next_operation_id()
         data_with_id = [id] + data
         self.wks_operations.append_row(data_with_id, table_range=self.cells_range)
-        self.update_balance(int(data[3]))
+        self.update_balance(int(data[3]), data[1])
 
-    def update_balance(self, amount: int):
+    def update_balance(self, amount: int, tg_id: str):
         """Изменение баланса"""
-        try:
-            current_balance = int(self.wks_balance.acell("B1").value)
-        except TypeError:
-            current_balance = 0
-        self.wks_balance.update_cell(1, 2, current_balance + amount)
+        user_row = self.get_user_row_from_table(tg_id)
+        current_balance = int(self.wks_balance.acell(f"D{user_row}").value)
+        self.wks_balance.update_cell(user_row, 4, current_balance + amount)
 
-    def get_balance(self):
-        """Получение баланса"""
-        balance = self.wks_balance.acell("B1").value
-        return balance
+    def get_all_info_from_balance(self) -> list[list]:
+        """Получение всех данных из таблицы Баланс"""
+        all_values = self.wks_balance.get_all_values()[1:]
+        return all_values
+    #
+    # def get_balance(self):
+    #     """Получение баланса"""
+    #     balance = ""
+    #     for user in self.get_all_info_from_balance():
+    #         balance += f"{user[0]}. ТГ id:{user[1]} пользователь {user[2]} сумма:{user[3]} руб. \n"
+    #     return balance
+
+    def get_user_row_from_table(self, tg_id: str) -> int | None:
+        """Получение пользователя из таблицы"""
+        cell = self.wks_balance.find(tg_id)
+        if cell:
+            return cell.row
+        return None
+
+    def create_user_in_balance(self, tg_id: str, username: str):
+        """Добавление пользователя в лист баланса"""
+        # если пользователь уже нажимал старт или есть в таблице
+        if self.get_user_row_from_table(tg_id):
+            return
+
+        table_id = self.get_next_balance_id()
+        data = [table_id, tg_id, username, 0]
+        self.wks_balance.append_row(data, table_range="A1:D1")
+
+    def get_all_users(self):
+        all_users_tg_id = self.wks_balance.col_values(2)[1:]
+        all_users_username = self.wks_balance.col_values(3)[1:]
+        return all_users_tg_id, all_users_username
 
 
 gs = GoogleSheets(config.CREDS_FILE, config.TABLE_NAME, "A1:F1")

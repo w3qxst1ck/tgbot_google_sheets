@@ -5,5 +5,15 @@ from config import ADMINS
 
 async def send_balance_report(bot: Bot):
     """Получение баланса раз в день"""
-    balance = gs.get_balance()
-    await bot.send_message(ADMINS[0], f"Ваш текущий баланс {balance} рублей.")
+    msg = "⚠️ <i>Ежедневный отчет:</i>\n\n"
+
+    balance_info = gs.get_all_info_from_balance()
+    if not balance_info:
+        msg += "Данные отсутствуют"
+        await bot.send_message(ADMINS[0], msg)
+        return
+
+    for row in balance_info:
+        msg += f"<b>{row[0]}.</b> Тг ID: {row[1]} пользователь <b>{row[2]}</b> сумма: <b>{row[3]}</b> руб. \n"
+
+    await bot.send_message(ADMINS[0], msg)
