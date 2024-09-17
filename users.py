@@ -1,3 +1,4 @@
+import aiogram
 from aiogram import Router, types, F
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, StateFilter
@@ -7,6 +8,7 @@ from utils import amount_validate
 from google_sheets_api import gs
 
 import keyboards as kb
+from config import GROUP_ID
 
 router = Router()
 
@@ -27,8 +29,7 @@ async def plus_operation(callback: types.CallbackQuery, state: FSMContext) -> No
     else:
         await state.update_data(type="Списание")
 
-    msg = await callback.message.edit_text("Укажите сумму (только число, без знаков +- или указания валют по типу р. руб."
-                                     "\nНапример: 1200.)", reply_markup=kb.cancel_keyboard().as_markup())
+    msg = await callback.message.edit_text("Укажите сумму (например 550)", reply_markup=kb.cancel_keyboard().as_markup())
     await state.update_data(prev_message=msg)
 
 
@@ -66,7 +67,7 @@ async def get_amount(message: types.Message, state: FSMContext) -> None:
 
 
 @router.message(OperationFSM.comment, F.text)
-async def get_comment(message: types.Message, state: FSMContext) -> None:
+async def get_comment(message: types.Message, state: FSMContext, bot: aiogram.Bot) -> None:
     """Получение комментария к операции"""
     comment = message.text
     await state.update_data(comment=comment)
@@ -84,8 +85,12 @@ async def get_comment(message: types.Message, state: FSMContext) -> None:
     await message.answer("Выберите действие 📋", reply_markup=kb.operations_keyboard().as_markup())
 
     await message.delete()
+
     prev_mess = data["prev_message"]
     await prev_mess.delete()
+
+    # оповещение в группу
+    await bot.send_message(chat_id=GROUP_ID, text="texttt")
 
 
 @router.callback_query(lambda callback: callback.data == "cancel", StateFilter("*"))
