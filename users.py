@@ -17,6 +17,9 @@ router = Router()
 @router.message(Command("start"))
 async def start_handler(message: types.Message) -> None:
     """Start message"""
+    if message.chat.type != "private":
+        return
+
     await message.answer("Выберите действие 📋", reply_markup=kb.operations_keyboard().as_markup())
     tg_id = str(message.from_user.id)
 
