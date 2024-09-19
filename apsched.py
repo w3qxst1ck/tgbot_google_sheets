@@ -16,4 +16,5 @@ async def send_balance_report(bot: Bot):
     for row in balance_info:
         msg += f"<b>{row[0]}.</b> Тг ID: {row[1]} пользователь <b>{row[2]}</b> сумма: <b>{row[3]}</b> руб. \n"
 
-    await bot.send_message(ADMINS[0], msg)
+    for admin in ADMINS:
+        await bot.send_message(admin, msg)
