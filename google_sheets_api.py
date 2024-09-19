@@ -39,7 +39,7 @@ class GoogleSheets:
     def add_operation(self, data: List):
         """Добавление новой строки"""
         id = self.get_next_operation_id()
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+        timestamp = datetime.now().strftime('%Y-%m-%d')
         data_with_id = [id, *data, timestamp]
         self.wks_operations.append_row(data_with_id, table_range=self.cells_range)
         self.update_balance(int(data[3]), data[1])
