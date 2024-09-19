@@ -30,11 +30,11 @@ async def add_balance(callback: types.CallbackQuery, state: FSMContext) -> None:
     await state.update_data(prev_message=msg)
 
 
-@router.callback_query(BalanceFSM.pick_user, lambda callback: callback.data.split("_")[0] == "add")
+@router.callback_query(BalanceFSM.pick_user, lambda callback: callback.data.split("!@#$%")[0] == "add")
 async def get_users_to_add(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Получение пользователя для пополнения"""
-    tg_id = callback.data.split("_")[1]
-    username = callback.data.split("_")[2]
+    tg_id = callback.data.split("!@#$%")[1]
+    username = callback.data.split("!@#$%")[2]
     await state.update_data(tg_id=tg_id)
     await state.update_data(username=username)
 
@@ -85,7 +85,18 @@ async def get_amount(message: types.Message, state: FSMContext, bot: aiogram.Bot
 @router.callback_query(lambda callback: callback.data == "get_report")
 async def get_report(callback: types.CallbackQuery, bot: aiogram.Bot):
     """Получение отчета вручную"""
-    await send_balance_report(bot)
+    balance_info = gs.get_all_info_from_balance()
+    msg = "⚠️ <i>Отчет:</i>\n\n"
+
+    if not balance_info:
+        msg += "Данные отсутствуют"
+        await callback.message.answer(msg)
+        return
+
+    for row in balance_info:
+        msg += f"<b>{row[0]}.</b> Тг ID: {row[1]} пользователь <b>{row[4]} ({row[2]})</b> сумма: <b>{row[3]}</b> руб. \n\n"
+
+    await callback.message.answer(msg)
 
 
 @router.callback_query(lambda callback: callback.data == "cancel", StateFilter("*"))

@@ -17,7 +17,7 @@ def all_users_keyboard(all_tg_id: list, all_username: list) -> InlineKeyboardBui
     """Клавиатура выбора пользователя для пополнения"""
     keyboard = InlineKeyboardBuilder()
     for i in range(len(all_tg_id)):
-        keyboard.row(InlineKeyboardButton(text=f"{all_username[i]}", callback_data=f"add_{all_tg_id[i]}_{all_username[i]}"))
+        keyboard.row(InlineKeyboardButton(text=f"{all_username[i]}", callback_data=f"add!@#$%{all_tg_id[i]}!@#$%{all_username[i]}"))
     keyboard.adjust(2)
     keyboard.row(InlineKeyboardButton(text="Отмена", callback_data=f"cancel"))
     return keyboard

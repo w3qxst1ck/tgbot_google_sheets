@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List
 import config
 
@@ -14,14 +15,14 @@ class GoogleSheets:
         # первоначальное заполнение шапки таблиц
         self.wks_balance.batch_update([
             {
-                "range": "A1:D1",
-                "values": [["№", "ID(тг)", "Имя", "Текущий баланс"]]
+                "range": "A1:E1",
+                "values": [["№", "ID(тг)", "Ник(тг)", "Текущий баланс", "Имя"]]
             }
         ])
         self.wks_operations.batch_update([
             {
-                "range": "A1:F1",
-                "values": [["№", "Вид операции", "ID(тг)", "Имя", "Сумма", "Комментарий"]]
+                "range": "A1:G1",
+                "values": [["№", "Вид операции", "ID(тг)", "Имя", "Сумма", "Комментарий", "Дата"]]
             }
         ])
 
@@ -38,7 +39,8 @@ class GoogleSheets:
     def add_operation(self, data: List):
         """Добавление новой строки"""
         id = self.get_next_operation_id()
-        data_with_id = [id] + data
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+        data_with_id = [id, *data, timestamp]
         self.wks_operations.append_row(data_with_id, table_range=self.cells_range)
         self.update_balance(int(data[3]), data[1])
 
@@ -52,13 +54,6 @@ class GoogleSheets:
         """Получение всех данных из таблицы Баланс"""
         all_values = self.wks_balance.get_all_values()[1:]
         return all_values
-    #
-    # def get_balance(self):
-    #     """Получение баланса"""
-    #     balance = ""
-    #     for user in self.get_all_info_from_balance():
-    #         balance += f"{user[0]}. ТГ id:{user[1]} пользователь {user[2]} сумма:{user[3]} руб. \n"
-    #     return balance
 
     def get_user_row_from_table(self, tg_id: str) -> int | None:
         """Получение пользователя из таблицы"""
@@ -83,7 +78,7 @@ class GoogleSheets:
         return all_users_tg_id, all_users_username
 
 
-gs = GoogleSheets(config.CREDS_FILE, config.TABLE_NAME, "A1:F1")
+gs = GoogleSheets(config.CREDS_FILE, config.TABLE_NAME, "A1:G1")
 
 
 

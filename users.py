@@ -47,7 +47,7 @@ async def plus_operation(callback: types.CallbackQuery, state: FSMContext) -> No
 
 
 @router.message(OperationFSM.amount, F.text)
-async def get_amount(message: types.Message, state: FSMContext) -> None:
+async def get_amount(message: types.Message, state: FSMContext, bot: aiogram.Bot) -> None:
     """Получение суммы, данных о пользователе"""
     await state.update_data(tg_id=str(message.from_user.id))
 
@@ -72,14 +72,35 @@ async def get_amount(message: types.Message, state: FSMContext) -> None:
 
     else:
         await state.update_data(amount=result)
-        await state.set_state(OperationFSM.comment)
 
         data = await state.get_data()
-        prev_mess = data["prev_message"]
-        await prev_mess.delete()
 
-        msg = await message.answer("Укажите комментарий к операции", reply_markup=kb.cancel_keyboard().as_markup())
-        await state.update_data(prev_message=msg)
+        # ЗАЧЕСЛЕНИЕ
+        if data["type"] == "Зачисление":
+            await state.clear()
+
+            prev_mess = data["prev_message"]
+            await prev_mess.delete()
+
+            data_for_record = [data["type"], data["tg_id"], data["username"], data["amount"], ""]
+            gs.add_operation(data_for_record)
+
+            await message.answer(
+                f"Операция успешно записана! ✅\n\n<i>Операция: {data['type']} на сумму {data['amount']}</i>")
+            await message.answer("Выберите действие 📋", reply_markup=kb.operations_keyboard().as_markup())
+
+            # оповещение в группу
+            await bot.send_message(chat_id=GROUP_ID, text=ms.create_notify_group_message(data))
+
+        # СПИСАНИЕ
+        else:
+            await state.set_state(OperationFSM.comment)
+
+            prev_mess = data["prev_message"]
+            await prev_mess.delete()
+
+            msg = await message.answer("Укажите комментарий к операции", reply_markup=kb.cancel_keyboard().as_markup())
+            await state.update_data(prev_message=msg)
 
 
 @router.message(OperationFSM.comment, F.text)
@@ -89,15 +110,14 @@ async def get_comment(message: types.Message, state: FSMContext, bot: aiogram.Bo
     await state.update_data(comment=comment)
 
     data = await state.get_data()
-    if data["type"] == "Списание":
-        data["amount"] *= -1
-
     await state.clear()
+
+    data["amount"] *= -1
 
     data_for_record = [data["type"], data["tg_id"], data["username"], data["amount"], data["comment"]]
     gs.add_operation(data_for_record)
 
-    await message.answer(f"Операция успешно записана! ✅\n\n <i>Операция: {data['type']} на сумму {data['amount']}</i>")
+    await message.answer(f"Операция успешно записана! ✅\n\n<i>Операция: {data['type']} на сумму {data['amount']}</i>")
     await message.answer("Выберите действие 📋", reply_markup=kb.operations_keyboard().as_markup())
 
     prev_mess = data["prev_message"]

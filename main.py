@@ -14,16 +14,6 @@ from config import BOT_TOKEN
 import admin
 import users
 
-#
-# async def set_commands(bot: io.Bot):
-#     """Перечень команд для бота"""
-#     commands = [
-#         BotCommand(command="start", description="Запуск бота"),
-#         BotCommand(command="balance", description="Пополнить баланс"),
-#     ]
-#
-#     await bot.set_my_commands(commands, BotCommandScopeDefault())
-
 
 async def start_bot() -> None:
     """Запуск бота"""
